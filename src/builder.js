@@ -208,3 +208,26 @@ export async function loadCache(storage, modelId) {
 export async function persistCache(corpus, cache) {
   await corpus.storage.writeJSON(CACHE_FILE, cache);
 }
+
+export async function clearCache(corpus) {
+  await corpus.storage.delete(CACHE_FILE);
+}
+
+export function pruneCache(cache, validHashes) {
+  const valid = validHashes instanceof Set ? validHashes : new Set(validHashes);
+  let removed = 0;
+  for (const hash of Object.keys(cache.entries)) {
+    if (!valid.has(hash)) {
+      delete cache.entries[hash];
+      removed++;
+    }
+  }
+  return removed;
+}
+
+export function cacheStats(cache) {
+  return {
+    model: cache.model,
+    entryCount: Object.keys(cache.entries).length,
+  };
+}
