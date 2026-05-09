@@ -62,4 +62,61 @@ export class BM25Index {
     const limit = opts.limit || 5;
     return results.slice(0, limit);
   }
+
+  async addNode(node, text) {
+    if (node.level === "corpus") return;
+    const record = {
+      id: node.node_id,
+      node_id: node.node_id,
+      doc_id: node.doc_id,
+      title: node.title || "",
+      summary: node.summary || "",
+      text: (text || "").slice(0, 4000),
+      keywords: (node.keywords || []).join(" "),
+      page_start: node.page_start,
+      page_end: node.page_end,
+    };
+    if (this.ms.has(node.node_id)) {
+      this.ms.replace(record);
+    } else {
+      this.ms.add(record);
+    }
+  }
+
+  removeNode(node_id) {
+    if (this.ms.has(node_id)) {
+      this.ms.discard(node_id);
+    }
+  }
+
+  async save(storage) {
+    const json = JSON.stringify(this.ms);
+    await storage.writeJSON(BM25_FILE, { version: 1, payload: json });
+  }
+
+  async load(storage) {
+    const wrapper = await storage.readJSON(BM25_FILE);
+    if (!wrapper || !wrapper.payload) return false;
+    try {
+      this.ms = MiniSearch.loadJSON(wrapper.payload, {
+        fields: FIELDS,
+        storeFields: STORE_FIELDS,
+        idField: "id",
+        searchOptions: {
+          boost: { title: 3, summary: 1.5, keywords: 2 },
+          fuzzy: 0.2,
+          prefix: true,
+          combineWith: "OR",
+        },
+      });
+      return true;
+    } catch {
+      this.ms = this._fresh();
+      return false;
+    }
+  }
+
+  size() {
+    return this.ms.documentCount;
+  }
 }
