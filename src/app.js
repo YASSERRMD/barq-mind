@@ -66,11 +66,29 @@ async function refresh() {
   renderTreeView(ui.treeView, db.corpus.tree, { highlightIds: Array.from(pathHighlight) });
 }
 
+function showTourIfFirstVisit() {
+  try {
+    if (localStorage.getItem("barq-mind:tour-seen")) return;
+    const dlg = $("tour-dialog");
+    if (dlg) {
+      dlg.showModal();
+      localStorage.setItem("barq-mind:tour-seen", "1");
+    }
+  } catch { /* localStorage unavailable */ }
+}
+
 async function bootstrap() {
   setStatusDot("idle", "idle");
   if (!("gpu" in navigator)) {
+    const fallback = document.createElement("div");
+    fallback.className = "fallback-banner";
+    fallback.innerHTML = `
+      <h3>WebGPU is not available</h3>
+      <p>barq-mind needs WebGPU to run the on-device model. Use Chrome 113+ or Edge 113+ on a machine with a WebGPU-capable GPU. The page must be served over <code>http://localhost</code> or HTTPS.</p>
+    `;
+    document.querySelector(".center-pane").prepend(fallback);
     appendSystem(ui.conversation,
-      "WebGPU is not available in this browser. The model cannot run. Use Chrome 113+ or Edge 113+.",
+      "WebGPU is not available in this browser. The model cannot run.",
       "warn"
     );
     setStatusDot("err", "no webgpu");
@@ -83,6 +101,7 @@ async function bootstrap() {
       `Corpus opened. ${db.listDocuments().length} document(s) indexed. Load the model and ingest a document to begin.`,
       "info"
     );
+    showTourIfFirstVisit();
   } catch (e) {
     appendSystem(ui.conversation, `Open failed: ${e.message}`, "warn");
     setStatusDot("err", "open failed");
