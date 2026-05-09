@@ -7,6 +7,8 @@ import { Tree, makeNode } from "./tree.js";
 import { InferenceEngine } from "./inference.js";
 import { summarizeTree, loadCache, cacheStats } from "./builder.js";
 import { ingestMarkdown, ingestPlainText } from "./ingest.js";
+import { Navigator } from "./navigator.js";
+import { Synthesizer } from "./synthesizer.js";
 
 const TREE_FILE = "tree";
 const RAW_PREFIX = "raw";
@@ -198,6 +200,46 @@ export class CognitiveDB {
     this._ensureOpen();
     await this.corpus.removeDocument(docId);
     log("info", "removed document", docId);
+  }
+
+  async navigate(query, opts = {}) {
+    this._ensureOpen();
+    if (!this.inference.ready) {
+      throw new CognitiveError("model not loaded; call loadModel() first", "MODEL_NOT_LOADED");
+    }
+    const nav = new Navigator(this, this.inference);
+    return await nav.navigate(query, opts);
+  }
+
+  async ask(query, opts = {}) {
+    this._ensureOpen();
+    if (!this.inference.ready) {
+      throw new CognitiveError("model not loaded; call loadModel() first", "MODEL_NOT_LOADED");
+    }
+    const t0 = performance.now();
+    const navResult = await this.navigate(query, opts);
+    let leafIds = navResult.selectedLeaves;
+    let path = navResult.path;
+    if (navResult.fallback) {
+      log("info", "BM25 fallback path", navResult.query_terms);
+      if (this.bm25) {
+        const hits = this.bm25.search(navResult.query_terms.join(" "), { limit: 5 });
+        leafIds = hits.map((h) => h.node_id);
+      } else {
+        leafIds = [];
+      }
+    }
+    const synth = new Synthesizer(this, this.inference);
+    const result = await synth.synthesize(query, leafIds, path);
+    return {
+      answer: result.answer,
+      citations: result.citations,
+      raw_response: result.raw_response,
+      durationMs: performance.now() - t0,
+      trace: navResult.traces,
+      fallback: navResult.fallback || false,
+      selectedLeaves: leafIds,
+    };
   }
 
   async stats() {
