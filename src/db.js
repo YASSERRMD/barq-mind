@@ -6,7 +6,7 @@ import { Storage } from "./storage.js";
 import { Tree, makeNode } from "./tree.js";
 import { InferenceEngine } from "./inference.js";
 import { summarizeTree, loadCache, cacheStats } from "./builder.js";
-import { ingestMarkdown, ingestPlainText } from "./ingest.js";
+import { ingestMarkdown, ingestPlainText, ingestPDF } from "./ingest.js";
 import { Navigator } from "./navigator.js";
 import { Synthesizer } from "./synthesizer.js";
 import { BM25Index } from "./bm25.js";
@@ -187,7 +187,7 @@ export class CognitiveDB {
       } else if (type === "text") {
         docRoot = await ingestPlainText(this.corpus, { title, text: content });
       } else if (type === "pdf") {
-        throw new CognitiveError("PDF ingestion arrives in Phase 12", "NOT_YET");
+        docRoot = await ingestPDF(this.corpus, { title, content });
       } else {
         throw new CognitiveError(`unknown ingest type: ${type}`, "BAD_INPUT");
       }
