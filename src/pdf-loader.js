@@ -1,7 +1,14 @@
 // pdf.js loader for page-aware text extraction. Returns a pages array shaped
 // like [{page_number, text}, ...] that ingestPaged consumes.
+//
+// pdf.js is pinned to 4.0.379 via direct cdnjs URLs. Using a direct URL
+// (not the import map) keeps the dependency self-contained: pdf.js loads
+// dynamically only on first PDF ingest, and bundles its own worker.
+//
+// To upgrade: bump PDFJS_VERSION below and verify against a known-good PDF.
+// The worker URL must match the loader URL exactly.
 
-const PDFJS_VERSION = "4.0.379";
+export const PDFJS_VERSION = "4.0.379";
 const PDFJS_URL = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.min.mjs`;
 const PDFJS_WORKER_URL = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.worker.min.mjs`;
 
