@@ -33,6 +33,7 @@
     import { runStorageTests } from "./tests/test-storage.js";
     import { runTreeTests } from "./tests/test-tree.js";
     import { runChunkerTests } from "./tests/test-chunker.js";
+    import { runIngestTests } from "./tests/test-ingest.js";
 
     (async () => {
       section("storage");
@@ -41,6 +42,8 @@
       await runTreeTests();
       section("chunker");
       await runChunkerTests();
+      section("ingest");
+      await runIngestTests();
     })();
   </script>
 </body>
