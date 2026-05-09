@@ -101,6 +101,49 @@ export class EvalHarness {
     return { items, summary };
   }
 
+  async runBaselineBM25(evalSet) {
+    await this.db._ensureBM25();
+    const items = [];
+    const latencies = [];
+    for (const item of evalSet) {
+      const t0 = performance.now();
+      const hits = this.db.bm25.search(item.question, { limit: 5 });
+      const ms = performance.now() - t0;
+      latencies.push(ms);
+      const predicted = hits.map((h) => h.node_id);
+      const expected = item.expected_leaf_ids || [];
+      const docs = new Set(predicted.map((id) => idDoc(id)));
+      const docRecall = item.expected_doc_id ? (docs.has(item.expected_doc_id) ? 1 : 0) : 1;
+      const leafRecall = recall(predicted, expected);
+      items.push({
+        question: item.question,
+        predicted_leaves: predicted,
+        expected_leaves: expected,
+        metrics: { docRecall, leafRecall, pageRecall: 0, phrasesPresent: false, phrasesMatched: 0, phrasesTotal: 0, hasCitations: false },
+        durationMs: ms,
+        baseline: true,
+      });
+    }
+    const avg = (k) =>
+      items.length === 0
+        ? 0
+        : items.reduce((s, it) => s + (it.metrics ? it.metrics[k] : 0), 0) / items.length;
+    return {
+      items,
+      summary: {
+        itemCount: items.length,
+        avgDocRecall: avg("docRecall"),
+        avgLeafRecall: avg("leafRecall"),
+        avgPageRecall: 0,
+        avgPhrasesPresent: 0,
+        citationRate: 0,
+        latencyP50: quantile(latencies, 0.5),
+        latencyP95: quantile(latencies, 0.95),
+        mode: "bm25-only",
+      },
+    };
+  }
+
   toMarkdown(report) {
     const lines = ["# barq-mind eval report", ""];
     const s = report.summary;
