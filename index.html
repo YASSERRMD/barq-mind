@@ -14,18 +14,100 @@
   }
   </script>
 </head>
-<body>
+<body class="app">
   <header class="topbar">
-    <h1>barq-mind: vector-free hierarchical retrieval</h1>
-    <span class="version">v0.1.0-dev</span>
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <h1>barq-mind</h1>
+      <span class="tagline">vector-free hierarchical retrieval</span>
+    </div>
+    <div class="topbar-meta">
+      <span id="status-dot" class="status-dot idle" title="idle"></span>
+      <span id="status-text" class="status-text">idle</span>
+      <span class="version">v0.1.0-dev</span>
+    </div>
   </header>
 
-  <main class="shell">
-    <section class="panel">
-      <h2>Environment</h2>
-      <div id="status">Detecting capabilities...</div>
+  <main class="three-pane">
+    <aside class="pane left-pane">
+      <section class="panel">
+        <h2>Stats</h2>
+        <div id="stats"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Model</h2>
+        <div class="row-buttons">
+          <button id="btn-load-model" class="primary">Load Model</button>
+        </div>
+        <div id="model-progress" class="progress-line">not loaded</div>
+      </section>
+
+      <section class="panel">
+        <h2>Documents</h2>
+        <div class="row-buttons">
+          <input type="file" id="file-input" multiple accept=".txt,.md,.markdown,.pdf,.json" hidden />
+          <button id="btn-upload">Upload</button>
+          <button id="btn-paste">Paste</button>
+          <button id="btn-load-sample">Sample</button>
+        </div>
+        <div id="doc-list" class="doc-list">no documents</div>
+      </section>
+
+      <section class="panel">
+        <h2>Corpus</h2>
+        <div class="row-buttons">
+          <button id="btn-export">Export</button>
+          <button id="btn-import">Import</button>
+          <button id="btn-reset" class="danger">Reset</button>
+        </div>
+      </section>
+    </aside>
+
+    <section class="pane center-pane">
+      <div class="toolbar">
+        <label class="check"><input type="checkbox" id="opt-trace" /> show trace</label>
+        <label class="check"><input type="checkbox" id="opt-bm25" checked /> BM25 fallback</label>
+        <label class="num">depth <input type="number" id="opt-depth" value="4" min="1" max="8" /></label>
+        <label class="num">branch <input type="number" id="opt-branch" value="1" min="1" max="4" /></label>
+      </div>
+
+      <div id="conversation" class="conversation"></div>
+
+      <form id="composer" class="composer">
+        <textarea id="composer-input" rows="2" placeholder="Ask a question about the indexed corpus..."></textarea>
+        <button type="submit" id="btn-ask" class="primary" disabled>Ask</button>
+      </form>
     </section>
+
+    <aside class="pane right-pane">
+      <section class="panel">
+        <h2>Tree</h2>
+        <div id="tree-view" class="tree-view">corpus is empty</div>
+      </section>
+
+      <section class="panel">
+        <h2>Eval</h2>
+        <div id="eval-pane" class="hint">eval harness arrives in Phase 14</div>
+      </section>
+    </aside>
   </main>
+
+  <dialog id="paste-dialog" class="dialog">
+    <form method="dialog" class="paste-form">
+      <h3>Paste content</h3>
+      <input type="text" id="paste-title" placeholder="Title" required />
+      <select id="paste-type">
+        <option value="markdown">Markdown</option>
+        <option value="text">Plain text</option>
+      </select>
+      <textarea id="paste-body" rows="14" placeholder="Paste your document text here..." required></textarea>
+      <div class="dialog-actions">
+        <button value="cancel">Cancel</button>
+        <button value="ok" class="primary">Ingest</button>
+      </div>
+    </form>
+  </dialog>
 
   <noscript>
     <p>This app requires JavaScript and a WebGPU-capable browser (Chrome 113+ or Edge 113+).</p>
