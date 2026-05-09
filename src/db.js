@@ -218,4 +218,46 @@ export class CognitiveDB {
       cache,
     };
   }
+
+  async exportJSON() {
+    this._ensureOpen();
+    const tree = this.corpus.tree.toJSON();
+    const rawTexts = {};
+    for (const docId of Object.keys(this.corpus.tree.docIndex)) {
+      const blob = await this.corpus.storage.readBlob(`${RAW_PREFIX}/${docId}.txt`);
+      if (blob) rawTexts[docId] = await blob.text();
+    }
+    let cache = null;
+    try {
+      cache = await loadCache(this.corpus.storage, this.inference.modelId);
+    } catch { /* ignore */ }
+    return { version: 1, corpus: this.name, tree, rawTexts, cache };
+  }
+
+  async importJSON(json) {
+    this._ensureOpen();
+    if (!json || json.version !== 1 || !json.tree) {
+      throw new CognitiveError("import: invalid JSON shape", "BAD_INPUT");
+    }
+    await this.corpus.storage.clear();
+    this.corpus = await Corpus.open(this.name);
+    this.corpus.tree = Tree.fromJSON(json.tree);
+    for (const [docId, text] of Object.entries(json.rawTexts || {})) {
+      await this.corpus.storage.writeBlob(`${RAW_PREFIX}/${docId}.txt`, new Blob([text]));
+    }
+    if (json.cache) {
+      await this.corpus.storage.writeJSON("summary-cache", json.cache);
+    }
+    await this.corpus.save();
+    log("info", "imported corpus", this.name);
+  }
+
+  async reset() {
+    this._ensureOpen();
+    await this.corpus.storage.clear();
+    this.corpus = await Corpus.open(this.name);
+    log("info", "reset corpus", this.name);
+  }
 }
+
+export const db = new CognitiveDB();
