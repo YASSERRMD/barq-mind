@@ -6,6 +6,7 @@ import { Storage } from "./storage.js";
 import { Tree, makeNode } from "./tree.js";
 import { InferenceEngine } from "./inference.js";
 import { summarizeTree, loadCache, cacheStats } from "./builder.js";
+import { ingestMarkdown, ingestPlainText } from "./ingest.js";
 
 const TREE_FILE = "tree";
 const RAW_PREFIX = "raw";
@@ -155,6 +156,48 @@ export class CognitiveDB {
   listDocuments() {
     this._ensureOpen();
     return this.corpus.listDocuments();
+  }
+
+  async ingest(input) {
+    this._ensureOpen();
+    if (!input || typeof input !== "object") {
+      throw new CognitiveError("ingest: input object required", "BAD_INPUT");
+    }
+    const { type, title, content } = input;
+    if (!type || !title || content === undefined) {
+      throw new CognitiveError("ingest: type, title, content required", "BAD_INPUT");
+    }
+    let docRoot;
+    try {
+      if (type === "markdown") {
+        docRoot = await ingestMarkdown(this.corpus, { title, text: content });
+      } else if (type === "text") {
+        docRoot = await ingestPlainText(this.corpus, { title, text: content });
+      } else if (type === "pdf") {
+        throw new CognitiveError("PDF ingestion arrives in Phase 12", "NOT_YET");
+      } else {
+        throw new CognitiveError(`unknown ingest type: ${type}`, "BAD_INPUT");
+      }
+    } catch (e) {
+      if (e instanceof CognitiveError) throw e;
+      throw new CognitiveError(`ingest failed: ${e.message}`, "INGEST_FAILED", e);
+    }
+    log("info", "ingested", docRoot.doc_id, title);
+    let summarizationStarted = false;
+    if (this.inference.ready) {
+      summarizationStarted = true;
+      summarizeTree(this.corpus.tree, this.corpus, this.inference, {
+        onProgress: (done, total, t) => log("info", `summarize ${done}/${total}: ${t}`),
+      }).catch((e) => log("error", "summarization failed", e));
+    }
+    const leafCount = this.corpus.tree.getLeaves(docRoot.node_id).length;
+    return { docId: docRoot.doc_id, leafCount, summarizationStarted };
+  }
+
+  async removeDocument(docId) {
+    this._ensureOpen();
+    await this.corpus.removeDocument(docId);
+    log("info", "removed document", docId);
   }
 
   async stats() {
