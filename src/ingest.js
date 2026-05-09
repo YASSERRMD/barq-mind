@@ -3,6 +3,7 @@
 
 import { chunkMarkdown, chunkPlainText, chunkPagedDocument } from "./chunker.js";
 import { makeNode, nodeId } from "./tree.js";
+import { extractPdfPages } from "./pdf-loader.js";
 
 let counter = 0;
 function genDocId() {
@@ -218,4 +219,18 @@ export async function ingestPaged(corpus, opts) {
     rawText: concatenated,
   });
   return docRoot;
+}
+
+export async function ingestPDF(corpus, opts) {
+  const { title, content, onProgress } = opts;
+  if (!(content instanceof ArrayBuffer) && !ArrayBuffer.isView(content)) {
+    throw new Error("ingestPDF: content must be ArrayBuffer");
+  }
+  const buffer = content instanceof ArrayBuffer ? content : content.buffer;
+  const pages = await extractPdfPages(buffer, { onProgress });
+  return ingestPaged(corpus, {
+    docId: opts.docId,
+    title,
+    pages,
+  });
 }
