@@ -113,6 +113,14 @@ export async function sha256(text) {
     .join("");
 }
 
+// Hash an internal node's effective content as the join of its children's
+// hashes plus its title. Lets the summary cache invalidate when any child
+// summary changes upstream.
+export async function hashChildren(titles, childHashes) {
+  const blob = `${titles}|${childHashes.join("|")}`;
+  return sha256(blob);
+}
+
 export const TREE_SCHEMA_VERSION = 1;
 
 export class Tree {

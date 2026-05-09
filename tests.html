@@ -52,6 +52,7 @@
     import { runChunkerTests } from "./tests/test-chunker.js";
     import { runIngestTests } from "./tests/test-ingest.js";
     import { runPromptTests } from "./tests/test-prompts.js";
+    import { runBuilderTests } from "./tests/test-builder.js";
     import { InferenceEngine } from "./src/inference.js";
 
     (async () => {
@@ -65,6 +66,8 @@
       await runIngestTests();
       section("prompts");
       await runPromptTests();
+      section("builder");
+      await runBuilderTests();
     })();
 
     const engine = new InferenceEngine();
