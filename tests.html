@@ -32,12 +32,15 @@
     import { section } from "./tests/runner.js";
     import { runStorageTests } from "./tests/test-storage.js";
     import { runTreeTests } from "./tests/test-tree.js";
+    import { runChunkerTests } from "./tests/test-chunker.js";
 
     (async () => {
       section("storage");
       await runStorageTests();
       section("tree");
       await runTreeTests();
+      section("chunker");
+      await runChunkerTests();
     })();
   </script>
 </body>
