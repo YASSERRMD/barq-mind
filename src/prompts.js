@@ -68,9 +68,13 @@ function formatCurrentNode(node) {
 
 function formatChildren(children) {
   if (!children || !children.length) return "Candidate children: (none)";
+  // When there are many candidates, the navigation prompt becomes long and
+  // the model takes longer to generate. Cap each summary at 80 chars when
+  // the candidate count exceeds 8; full summaries otherwise.
+  const charBudget = children.length > 8 ? 80 : 220;
   const lines = children.map(
     (c, i) =>
-      `${i + 1}. id=${c.node_id} | leaf=${!!c.is_leaf} | level=${c.level} | title="${c.title}"\n   summary: ${(c.routing_summary || c.summary || "").slice(0, 220)}`
+      `${i + 1}. id=${c.node_id} | leaf=${!!c.is_leaf} | level=${c.level} | title="${c.title}"\n   summary: ${(c.routing_summary || c.summary || "").slice(0, charBudget)}`
   );
   return `Candidate children:\n${lines.join("\n")}`;
 }

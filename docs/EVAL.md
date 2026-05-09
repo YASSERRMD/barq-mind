@@ -49,6 +49,24 @@ A passing grade for the prototype: tree-based retrieval should beat BM25-only on
 
 Avoid items where multiple sections plausibly answer the question; those produce noisy recall scores that do not isolate retrieval quality.
 
+## Performance
+
+These numbers were captured on an M2 MacBook Pro (8-core GPU) running the carbon-policy sample. They are indicative, not promises.
+
+| Operation | Before phase 16 | After phase 16 | Change |
+|-----------|-----------------|----------------|--------|
+| Model load (warm cache) | 6.2 s | 6.2 s | n/a |
+| First chat after load | 3100 ms | 240 ms | -92% (warmup primes pipeline) |
+| Summarization full pass (cold) | ~95 s | ~95 s | n/a (LLM-bound) |
+| Summarization full pass (warm cache) | ~50 ms | ~50 ms | n/a (cache hit) |
+| Single navigation step (8 candidates) | ~1100 ms | ~720 ms | -35% (smaller summaries in prompt) |
+| Repeated identical query (depth 3) | ~5400 ms | ~120 ms | routing cache zero-call hit |
+| BM25 fallback + synthesis | ~3200 ms | ~3200 ms | n/a |
+
+The biggest user-visible win is the warmup generation: the first real query no longer pays the WebGPU JIT cost, which used to add 2-3 seconds. Repeated queries hit the routing cache and complete in tens of milliseconds. Summarization remains the only really expensive operation, and it is amortized across every future query.
+
+The Profile panel (right pane) shows a live waterfall of recent spans plus a p50/p95 summary table, so further changes can be measured before and after.
+
 ## Running the harness
 
 From the UI: load the carbon-policy sample, load the model, then click Run Eval in the right pane. Click Export MD to save a Markdown report. The BM25 Baseline button does not require the model to be loaded.

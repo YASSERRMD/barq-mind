@@ -316,3 +316,12 @@ input:focus, textarea:focus, select:focus {
 .tour-form h3 { margin: 0; color: var(--accent); }
 .tour-steps { margin: 0; padding-left: 22px; }
 .tour-steps li { margin: 4px 0; }
+
+.prof-list { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
+.prof-row { display: grid; grid-template-columns: 110px 1fr 60px; gap: 6px; align-items: center; font-family: var(--mono); font-size: 10px; }
+.prof-name { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prof-bar { height: 4px; background: var(--accent); border-radius: 2px; }
+.prof-ms { text-align: right; color: var(--text); }
+.prof-summary { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 10px; }
+.prof-summary th, .prof-summary td { padding: 3px 6px; text-align: left; border-bottom: 1px solid var(--border); }
+.prof-summary th { color: var(--text-muted); }

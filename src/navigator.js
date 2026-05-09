@@ -102,6 +102,32 @@ const RETRY_MESSAGE = {
     "Your previous response was not valid JSON. Respond ONLY with one JSON object matching the schema. No prose, no markdown.",
 };
 
+// Routing decision cache. Keyed by normalized query + current node id +
+// candidate id list. Repeated identical queries skip the LLM call.
+const routingCache = new Map();
+const ROUTING_CACHE_LIMIT = 200;
+
+function routingKey(query, currentNodeId, candidateIds) {
+  const norm = query.toLowerCase().trim().replace(/\s+/g, " ");
+  return `${norm}|${currentNodeId}|${[...candidateIds].sort().join(",")}`;
+}
+
+function cacheGet(key) {
+  return routingCache.get(key) || null;
+}
+
+function cacheSet(key, action) {
+  if (routingCache.size >= ROUTING_CACHE_LIMIT) {
+    const firstKey = routingCache.keys().next().value;
+    routingCache.delete(firstKey);
+  }
+  routingCache.set(key, action);
+}
+
+export function clearRoutingCache() {
+  routingCache.clear();
+}
+
 export class Navigator {
   constructor(db, inference) {
     this.db = db;
@@ -109,6 +135,9 @@ export class Navigator {
   }
 
   async callNavigate(query, currentNode, childOptions) {
+    const cacheK = routingKey(query, currentNode.node_id, childOptions.map((c) => c.node_id));
+    const hit = cacheGet(cacheK);
+    if (hit) return hit;
     const messages = promptNavigate(query, currentNode, childOptions);
     let resp;
     try {
@@ -118,7 +147,9 @@ export class Navigator {
     }
     try {
       const parsed = parseAction(resp.text);
-      return validateAgainstCandidates(parsed, childOptions);
+      const validated = validateAgainstCandidates(parsed, childOptions);
+      cacheSet(cacheK, validated);
+      return validated;
     } catch (firstErr) {
       // Retry once with explicit error feedback.
       const retryMessages = [
@@ -134,13 +165,17 @@ export class Navigator {
       }
       try {
         const parsed = parseAction(retryResp.text);
-        return validateAgainstCandidates(parsed, childOptions);
+        const validated = validateAgainstCandidates(parsed, childOptions);
+        cacheSet(cacheK, validated);
+        return validated;
       } catch {
-        return {
+        const fb = {
           action: "bm25_fallback",
           query_terms: query.split(/\s+/).slice(0, 5),
           reason: `parse failed twice: ${firstErr.message}`,
         };
+        cacheSet(cacheK, fb);
+        return fb;
       }
     }
   }

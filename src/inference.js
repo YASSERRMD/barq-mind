@@ -3,6 +3,7 @@
 // generation defaults (temperature=0.1, top_k=50, repetition_penalty=1.05).
 
 import { AutoModelForCausalLM, AutoTokenizer, TextStreamer } from "@huggingface/transformers";
+import { profiler } from "./profiler.js";
 
 export class InferenceError extends Error {
   constructor(message, code, cause) {
@@ -60,6 +61,15 @@ export class InferenceEngine {
     } catch (e) {
       throw new InferenceError(`model load failed: ${e.message}`, "LOAD_FAILED", e);
     }
+    if (opts.warmup !== false) {
+      // Throwaway generation primes the WebGPU pipelines so the first user
+      // query does not pay the one-time JIT cost.
+      try {
+        await this.chat([{ role: "user", content: "Hi" }], { max_new_tokens: 4 });
+      } catch {
+        // ignore warmup errors
+      }
+    }
   }
 
   _onProgress(cb, p) {
@@ -81,6 +91,7 @@ export class InferenceEngine {
   async chat(messages, opts = {}) {
     this._ensureReady();
     const t0 = performance.now();
+    const span = profiler.start("inference.chat", { tokens: opts.max_new_tokens });
     const genOpts = { ...DEFAULT_GEN, ...opts };
     const inputs = this.tokenizer.apply_chat_template(messages, {
       add_generation_prompt: true,
@@ -120,6 +131,7 @@ export class InferenceEngine {
     this.totalCalls++;
     this.totalGeneratedTokens += Array.isArray(generated) ? generated.length : 0;
     this.totalDurationMs += duration;
+    profiler.end(span, { tokens_out: Array.isArray(generated) ? generated.length : 0 });
     return {
       text,
       raw_tokens: Array.isArray(generated) ? generated.length : 0,

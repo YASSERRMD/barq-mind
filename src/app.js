@@ -12,6 +12,7 @@ import {
 } from "./ui/conversation.js";
 import { renderTreeView } from "./ui/tree-view.js";
 import { EvalHarness } from "./eval.js";
+import { profiler } from "./profiler.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -402,6 +403,45 @@ if (evalUi.btnExport) {
     a.download = `barq-mind-eval-${Date.now()}.md`;
     a.click();
     URL.revokeObjectURL(url);
+  });
+}
+
+// Profile waterfall view.
+const profileUi = {
+  pane: $("profile-pane"),
+  toggle: $("opt-profile"),
+};
+let unsubProfiler = null;
+
+function renderProfile() {
+  const report = profiler.report();
+  const recent = profiler.recent(8);
+  const max = recent.reduce((m, s) => Math.max(m, s.durationMs), 1);
+  const rows = recent
+    .map((s) => {
+      const w = Math.max(2, (s.durationMs / max) * 100);
+      return `<div class="prof-row"><span class="prof-name">${s.name}</span><div class="prof-bar" style="width:${w}%"></div><span class="prof-ms">${Math.round(s.durationMs)}ms</span></div>`;
+    })
+    .join("");
+  const summary = Object.entries(report)
+    .map(([name, r]) => `<tr><td>${name}</td><td>${r.count}</td><td>${Math.round(r.p50)}</td><td>${Math.round(r.p95)}</td></tr>`)
+    .join("");
+  profileUi.pane.innerHTML = `
+    <div class="prof-list">${rows || '<div class="muted">no spans yet</div>'}</div>
+    <table class="prof-summary"><thead><tr><th>span</th><th>n</th><th>p50</th><th>p95</th></tr></thead><tbody>${summary}</tbody></table>
+  `;
+}
+
+if (profileUi.toggle) {
+  profileUi.toggle.addEventListener("change", () => {
+    if (profileUi.toggle.checked) {
+      renderProfile();
+      unsubProfiler = profiler.on(() => renderProfile());
+    } else {
+      if (unsubProfiler) unsubProfiler();
+      unsubProfiler = null;
+      profileUi.pane.innerHTML = '<div class="hint">enable to record spans</div>';
+    }
   });
 }
 
