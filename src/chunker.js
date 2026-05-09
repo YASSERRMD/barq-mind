@@ -164,6 +164,64 @@ function deriveTitle(textSlice) {
   return firstLine || "Untitled";
 }
 
+export function chunkPagedDocument(pages, opts = {}) {
+  const targetChars = opts.targetChars || TARGET_CHARS;
+  const maxChars = opts.maxChars || MAX_CHARS;
+  const out = [];
+  let runningChar = 0;
+  for (const page of pages) {
+    if (typeof page !== "object" || typeof page.page_number !== "number") {
+      throw new Error("chunkPagedDocument: pages must have page_number");
+    }
+    const text = page.text || "";
+    const pageStart = runningChar;
+    if (text.length <= maxChars) {
+      out.push({
+        level: "page",
+        title: `Page ${page.page_number}`,
+        char_start: pageStart,
+        char_end: pageStart + text.length,
+        text,
+        page_start: page.page_number,
+        page_end: page.page_number,
+        children: [],
+      });
+    } else {
+      const pieces = splitBySentences(text, targetChars, maxChars);
+      const children = [];
+      let cursor = 0;
+      for (const piece of pieces) {
+        const idx = text.indexOf(piece, cursor);
+        const start = pageStart + (idx >= 0 ? idx : cursor);
+        const end = start + piece.length;
+        children.push({
+          level: "leaf",
+          title: deriveTitle(piece),
+          char_start: start,
+          char_end: end,
+          text: piece,
+          page_start: page.page_number,
+          page_end: page.page_number,
+          children: [],
+        });
+        cursor = (idx >= 0 ? idx : cursor) + piece.length;
+      }
+      out.push({
+        level: "page",
+        title: `Page ${page.page_number}`,
+        char_start: pageStart,
+        char_end: pageStart + text.length,
+        text: "",
+        page_start: page.page_number,
+        page_end: page.page_number,
+        children,
+      });
+    }
+    runningChar += text.length + 1;
+  }
+  return out;
+}
+
 export function chunkPlainText(text, opts = {}) {
   const targetChars = opts.targetChars || TARGET_CHARS;
   const maxChars = opts.maxChars || MAX_CHARS;
