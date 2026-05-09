@@ -99,6 +99,104 @@ export async function summarizeLeavesPass(tree, corpus, inference, cache, opts =
   await persistCache(corpus, cache);
 }
 
+async function summarizeInternal(node, childContext, inference) {
+  const routingMessages = promptRoutingSummary(node, childContext);
+  const routingResp = await inference.chat(routingMessages, { max_new_tokens: 80 });
+  const routing_summary = truncateSummary(routingResp.text);
+
+  const fullMessages = promptFullSummary(node, childContext, "");
+  const fullResp = await inference.chat(fullMessages, { max_new_tokens: 280 });
+  const summary = truncateSummary(fullResp.text);
+
+  const blob = childContext.map((c) => `${c.title} ${c.snippet}`).join(" ");
+  const keywordsMessages = promptKeywords(blob);
+  const kwResp = await inference.chat(keywordsMessages, { max_new_tokens: 120 });
+  const keywords = parseKeywords(kwResp.text);
+
+  return { routing_summary, summary, keywords };
+}
+
+function topologicalInternal(tree) {
+  const order = [];
+  const stack = [{ id: tree.rootId, visited: false }];
+  const seen = new Set();
+  while (stack.length) {
+    const top = stack[stack.length - 1];
+    const node = tree.getNode(top.id);
+    if (!node) {
+      stack.pop();
+      continue;
+    }
+    if (top.visited) {
+      stack.pop();
+      if (!node.is_leaf) order.push(node);
+      continue;
+    }
+    top.visited = true;
+    for (const cid of node.child_ids) {
+      if (!seen.has(cid)) {
+        seen.add(cid);
+        stack.push({ id: cid, visited: false });
+      }
+    }
+  }
+  return order;
+}
+
+export async function summarizeInternalsPass(tree, inference, cache, opts = {}) {
+  const { onProgress, force = false } = opts;
+  const internals = topologicalInternal(tree);
+  let updates = 0;
+  for (let i = 0; i < internals.length; i++) {
+    const node = internals[i];
+    const childContext = node.child_ids
+      .map((cid) => tree.getNode(cid))
+      .filter(Boolean)
+      .map((c) => ({
+        title: c.title,
+        snippet: (c.routing_summary || c.summary || "").slice(0, 220),
+      }));
+    const childHashes = node.child_ids
+      .map((cid) => tree.getNode(cid))
+      .filter(Boolean)
+      .map((c) => c.source_hash || "");
+    const hash = await hashChildren(node.title, childHashes);
+    const cached = !force && cache.entries[hash];
+    if (cached) {
+      node.routing_summary = cached.routing_summary;
+      node.summary = cached.summary;
+      node.keywords = cached.keywords;
+      node.source_hash = hash;
+    } else {
+      const out = await summarizeInternal(node, childContext, inference);
+      node.routing_summary = out.routing_summary;
+      node.summary = out.summary;
+      node.keywords = out.keywords;
+      node.source_hash = hash;
+      cache.entries[hash] = {
+        routing_summary: out.routing_summary,
+        summary: out.summary,
+        keywords: out.keywords,
+        model: inference.modelId,
+        created_at: Date.now(),
+      };
+      updates++;
+    }
+    tree.upsertNode(node);
+    if (typeof onProgress === "function") onProgress(i + 1, internals.length, node.title);
+  }
+  return updates;
+}
+
+export async function summarizeTree(tree, corpus, inference, opts = {}) {
+  const cache = await loadCache(corpus.storage, inference.modelId);
+  await summarizeLeavesPass(tree, corpus, inference, cache, opts);
+  const internalUpdates = await summarizeInternalsPass(tree, inference, cache, opts);
+  await corpus.save();
+  await persistCache(corpus, cache);
+  return { internalUpdates };
+}
+
 export async function loadCache(storage, modelId) {
   const json = await storage.readJSON(CACHE_FILE);
   if (!json || json.model !== modelId) {
