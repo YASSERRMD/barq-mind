@@ -54,6 +54,7 @@
     import { runPromptTests } from "./tests/test-prompts.js";
     import { runBuilderTests } from "./tests/test-builder.js";
     import { runNavigatorTests } from "./tests/test-navigator.js";
+    import { runSynthesizerTests } from "./tests/test-synthesizer.js";
     import { InferenceEngine } from "./src/inference.js";
 
     (async () => {
@@ -71,6 +72,8 @@
       await runBuilderTests();
       section("navigator");
       await runNavigatorTests();
+      section("synthesizer");
+      await runSynthesizerTests();
     })();
 
     const engine = new InferenceEngine();
