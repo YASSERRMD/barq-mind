@@ -112,3 +112,166 @@ export async function sha256(text) {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
+
+export const TREE_SCHEMA_VERSION = 1;
+
+export class Tree {
+  constructor(rootId, nodesById = new Map(), opts = {}) {
+    this.rootId = rootId;
+    this.nodesById = nodesById instanceof Map ? nodesById : new Map(Object.entries(nodesById));
+    this.corpusName = opts.corpusName || "default";
+    this.docIndex = opts.docIndex || {};
+  }
+
+  static fromJSON(json) {
+    if (!json || typeof json !== "object") {
+      throw new Error("Tree.fromJSON: invalid input");
+    }
+    if (json.version !== TREE_SCHEMA_VERSION) {
+      throw new Error(`Tree.fromJSON: unsupported version ${json.version}`);
+    }
+    const nodes = new Map();
+    for (const [id, n] of Object.entries(json.nodes || {})) {
+      nodes.set(id, n);
+    }
+    return new Tree(json.root_id, nodes, {
+      corpusName: json.corpus_name,
+      docIndex: json.doc_index || {},
+    });
+  }
+
+  toJSON() {
+    const nodes = {};
+    const sortedIds = Array.from(this.nodesById.keys()).sort();
+    for (const id of sortedIds) {
+      nodes[id] = this.nodesById.get(id);
+    }
+    return {
+      version: TREE_SCHEMA_VERSION,
+      corpus_name: this.corpusName,
+      root_id: this.rootId,
+      nodes,
+      doc_index: this.docIndex,
+    };
+  }
+
+  getNode(id) {
+    return this.nodesById.get(id) || null;
+  }
+
+  getRoot() {
+    return this.getNode(this.rootId);
+  }
+
+  getChildren(id) {
+    const node = this.getNode(id);
+    if (!node) return [];
+    return node.child_ids.map((cid) => this.getNode(cid)).filter(Boolean);
+  }
+
+  getPath(id) {
+    const path = [];
+    let cur = this.getNode(id);
+    const seen = new Set();
+    while (cur) {
+      if (seen.has(cur.node_id)) {
+        throw new Error(`getPath: cycle detected at ${cur.node_id}`);
+      }
+      seen.add(cur.node_id);
+      path.unshift(cur);
+      if (!cur.parent_id) break;
+      cur = this.getNode(cur.parent_id);
+    }
+    return path;
+  }
+
+  walk(visitor) {
+    const root = this.getRoot();
+    if (!root) return;
+    const stack = [{ node: root, depth: 0 }];
+    while (stack.length) {
+      const { node, depth } = stack.shift();
+      visitor(node, depth);
+      const children = this.getChildren(node.node_id);
+      for (let i = children.length - 1; i >= 0; i--) {
+        stack.unshift({ node: children[i], depth: depth + 1 });
+      }
+    }
+  }
+
+  walkLeaves(visitor) {
+    this.walk((node, depth) => {
+      if (node.is_leaf) visitor(node, depth);
+    });
+  }
+
+  getLeaves(parentId) {
+    const out = [];
+    const start = this.getNode(parentId);
+    if (!start) return out;
+    const stack = [start];
+    while (stack.length) {
+      const node = stack.pop();
+      if (node.is_leaf) {
+        out.push(node);
+      } else {
+        for (const child of this.getChildren(node.node_id)) {
+          stack.push(child);
+        }
+      }
+    }
+    return out;
+  }
+
+  replaceNode(node) {
+    const prev = this.nodesById.get(node.node_id);
+    if (prev && prev.parent_id !== node.parent_id) {
+      throw new Error(`replaceNode: parent_id mismatch for ${node.node_id}`);
+    }
+    this.nodesById.set(node.node_id, node);
+  }
+
+  upsertNode(node) {
+    this.nodesById.set(node.node_id, node);
+  }
+
+  removeSubtree(id) {
+    const node = this.getNode(id);
+    if (!node) return;
+    const stack = [node];
+    while (stack.length) {
+      const cur = stack.pop();
+      for (const cid of cur.child_ids) {
+        const child = this.getNode(cid);
+        if (child) stack.push(child);
+      }
+      this.nodesById.delete(cur.node_id);
+    }
+    if (node.parent_id) {
+      const parent = this.getNode(node.parent_id);
+      if (parent) {
+        parent.child_ids = parent.child_ids.filter((cid) => cid !== id);
+      }
+    }
+  }
+
+  stats() {
+    let nodeCount = 0;
+    let leafCount = 0;
+    let maxDepth = 0;
+    let internalCount = 0;
+    let totalBranching = 0;
+    this.walk((node, depth) => {
+      nodeCount++;
+      if (node.is_leaf) {
+        leafCount++;
+      } else {
+        internalCount++;
+        totalBranching += node.child_ids.length;
+      }
+      if (depth > maxDepth) maxDepth = depth;
+    });
+    const avgBranching = internalCount > 0 ? totalBranching / internalCount : 0;
+    return { nodeCount, leafCount, maxDepth, avgBranching };
+  }
+}
