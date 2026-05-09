@@ -1,5 +1,7 @@
-// barq-mind main entry. For Phase 0 the app does only capability detection.
-// Subsequent phases hang the CognitiveDB facade and UI shell off this module.
+// barq-mind main entry. Capability detection plus CognitiveDB bootstrap.
+// The full UI shell arrives in Phase 13.
+
+import { db } from "./db.js";
 
 const statusEl = document.getElementById("status");
 
@@ -69,6 +71,21 @@ function render(caps) {
   try {
     const caps = await detect();
     render(caps);
+    if (caps.hasOPFS) {
+      try {
+        await db.open();
+        const stats = await db.stats();
+        const note = document.createElement("p");
+        note.className = "hint";
+        note.textContent = `Corpus "${stats.corpus}" opened. ${stats.docCount} documents, ${stats.tree.nodeCount} nodes.`;
+        statusEl.appendChild(note);
+      } catch (e) {
+        const note = document.createElement("p");
+        note.className = "hint warn";
+        note.textContent = `corpus open failed: ${e.message}`;
+        statusEl.appendChild(note);
+      }
+    }
   } catch (e) {
     statusEl.textContent = `detection failed: ${e.message}`;
   }
