@@ -5,6 +5,19 @@ import { promptNavigate, NAVIGATE_SYSTEM } from "./prompts.js";
 
 const ALLOWED_ACTIONS = new Set(["descend", "select_leaves", "bm25_fallback", "widen"]);
 
+export const TRACE_PHASES = ["navigate", "synthesize", "fallback"];
+
+export function summarizeTrace(traces) {
+  return traces.map((t) => ({
+    depth: t.depth,
+    action: t.action.action,
+    candidate_count: t.candidates.length,
+    chosen: t.action.child_ids || t.action.leaf_ids || [],
+    reason: t.action.reason,
+    duration_ms: Math.round(t.duration_ms),
+  }));
+}
+
 export class NavigationError extends Error {
   constructor(message, code, cause) {
     super(message);
