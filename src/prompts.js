@@ -89,6 +89,41 @@ export function promptNavigate(query, currentNode, childOptions) {
   ];
 }
 
+export const SYNTHESIZE_SYSTEM =
+  "You are a precise question-answering assistant. Use ONLY the provided excerpts. " +
+  "Answer in 2 to 4 sentences. End with a Sources line listing the section names and " +
+  "page numbers (or node_ids if no pages). If the excerpts do not contain the answer, " +
+  "say 'Insufficient evidence in the indexed sources.'";
+
+function formatLeaves(leaves) {
+  return leaves
+    .map((leaf, i) => {
+      const loc =
+        leaf.page_start != null
+          ? `${leaf.title} (p${leaf.page_start}${leaf.page_end && leaf.page_end !== leaf.page_start ? `-p${leaf.page_end}` : ""})`
+          : `${leaf.title} [${leaf.node_id}]`;
+      const text = (leaf.text || "").slice(0, 1500);
+      return `[${i + 1}] ${loc}\n${text}`;
+    })
+    .join("\n\n");
+}
+
+export function promptSynthesize(query, leaves, navPath) {
+  const pathLine =
+    navPath && navPath.length
+      ? `Navigation path: ${navPath.map((p) => p.title || p).join(" > ")}`
+      : "Navigation path: (root)";
+  return [
+    { role: "system", content: SYNTHESIZE_SYSTEM },
+    {
+      role: "user",
+      content:
+        `Question: ${query}\n\n${pathLine}\n\nExcerpts:\n${formatLeaves(leaves)}\n\n` +
+        `Answer in 2 to 4 sentences using ONLY the excerpts. End with a single line beginning with "Sources:" listing section titles with pages or node_ids.`,
+    },
+  ];
+}
+
 export function promptKeywords(text) {
   return [
     { role: "system", content: "You extract concise keyword phrases from text. Output JSON only." },
