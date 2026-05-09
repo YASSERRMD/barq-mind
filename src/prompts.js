@@ -46,6 +46,49 @@ export function promptFullSummary(node, childContext, fullText) {
   ];
 }
 
+export const NAVIGATE_SYSTEM =
+  "You are a document navigation agent. Given a user question and a list of candidate " +
+  "sections (with IDs and short summaries), pick the next action. You must respond with " +
+  "a single JSON object and nothing else. Schema:\n" +
+  "{action: 'descend', child_ids: [string], reason: string}\n" +
+  "or {action: 'select_leaves', leaf_ids: [string], reason: string}\n" +
+  "or {action: 'bm25_fallback', query_terms: [string], reason: string}\n" +
+  "or {action: 'widen', reason: string}.\n" +
+  "Only use child_ids/leaf_ids that appear in the candidate list. Reason must be one short sentence.";
+
+function formatCurrentNode(node) {
+  return (
+    `Current node:\n` +
+    `  id: ${node.node_id}\n` +
+    `  title: ${node.title}\n` +
+    `  level: ${node.level}\n` +
+    `  summary: ${(node.summary || node.routing_summary || "").slice(0, 280)}`
+  );
+}
+
+function formatChildren(children) {
+  if (!children || !children.length) return "Candidate children: (none)";
+  const lines = children.map(
+    (c, i) =>
+      `${i + 1}. id=${c.node_id} | leaf=${!!c.is_leaf} | level=${c.level} | title="${c.title}"\n   summary: ${(c.routing_summary || c.summary || "").slice(0, 220)}`
+  );
+  return `Candidate children:\n${lines.join("\n")}`;
+}
+
+export function promptNavigate(query, currentNode, childOptions) {
+  return [
+    { role: "system", content: NAVIGATE_SYSTEM },
+    {
+      role: "user",
+      content:
+        `Question: ${query}\n\n` +
+        `${formatCurrentNode(currentNode)}\n\n` +
+        `${formatChildren(childOptions)}\n\n` +
+        `Respond with ONE JSON object matching the schema. Use ids ONLY from the candidate list.`,
+    },
+  ];
+}
+
 export function promptKeywords(text) {
   return [
     { role: "system", content: "You extract concise keyword phrases from text. Output JSON only." },
