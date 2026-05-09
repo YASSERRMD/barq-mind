@@ -61,6 +61,15 @@ export class InferenceEngine {
     } catch (e) {
       throw new InferenceError(`model load failed: ${e.message}`, "LOAD_FAILED", e);
     }
+    if (opts.warmup !== false) {
+      // Throwaway generation primes the WebGPU pipelines so the first user
+      // query does not pay the one-time JIT cost.
+      try {
+        await this.chat([{ role: "user", content: "Hi" }], { max_new_tokens: 4 });
+      } catch {
+        // ignore warmup errors
+      }
+    }
   }
 
   _onProgress(cb, p) {
