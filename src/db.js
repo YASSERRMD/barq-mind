@@ -9,6 +9,7 @@ import { summarizeTree, loadCache, cacheStats } from "./builder.js";
 import { ingestMarkdown, ingestPlainText } from "./ingest.js";
 import { Navigator } from "./navigator.js";
 import { Synthesizer } from "./synthesizer.js";
+import { BM25Index } from "./bm25.js";
 
 const TREE_FILE = "tree";
 const RAW_PREFIX = "raw";
@@ -125,7 +126,8 @@ export class CognitiveDB {
     this.name = name;
     this.corpus = null;
     this.inference = new InferenceEngine();
-    this.bm25 = null; // Phase 11 hook
+    this.bm25 = new BM25Index();
+    this._bm25Loaded = false;
     this.opened = false;
   }
 
@@ -135,10 +137,19 @@ export class CognitiveDB {
     try {
       this.corpus = await Corpus.open(this.name);
       this.opened = true;
-      log("info", "opened corpus", this.name);
+      this._bm25Loaded = await this.bm25.load(this.corpus.storage);
+      log("info", "opened corpus", this.name, "bm25_loaded:", this._bm25Loaded);
     } catch (e) {
       throw new CognitiveError(`failed to open corpus: ${e.message}`, "OPEN_FAILED", e);
     }
+  }
+
+  async _ensureBM25() {
+    if (this._bm25Loaded && this.bm25.size() > 0) return;
+    log("info", "building BM25 index");
+    await this.bm25.build(this.corpus.tree, this.corpus);
+    await this.bm25.save(this.corpus.storage);
+    this._bm25Loaded = true;
   }
 
   _ensureOpen() {
@@ -198,7 +209,25 @@ export class CognitiveDB {
 
   async removeDocument(docId) {
     this._ensureOpen();
+    const meta = this.corpus.tree.docIndex[docId];
+    const subtreeNodeIds = [];
+    if (meta) {
+      const root = this.corpus.tree.getNode(meta.root_id);
+      if (root) {
+        const stack = [root];
+        while (stack.length) {
+          const cur = stack.pop();
+          subtreeNodeIds.push(cur.node_id);
+          for (const cid of cur.child_ids) {
+            const c = this.corpus.tree.getNode(cid);
+            if (c) stack.push(c);
+          }
+        }
+      }
+    }
     await this.corpus.removeDocument(docId);
+    for (const id of subtreeNodeIds) this.bm25.removeNode(id);
+    if (this._bm25Loaded) await this.bm25.save(this.corpus.storage);
     log("info", "removed document", docId);
   }
 
@@ -222,12 +251,9 @@ export class CognitiveDB {
     let path = navResult.path;
     if (navResult.fallback) {
       log("info", "BM25 fallback path", navResult.query_terms);
-      if (this.bm25) {
-        const hits = this.bm25.search(navResult.query_terms.join(" "), { limit: 5 });
-        leafIds = hits.map((h) => h.node_id);
-      } else {
-        leafIds = [];
-      }
+      await this._ensureBM25();
+      const hits = this.bm25.search(navResult.query_terms.join(" "), { limit: 5 });
+      leafIds = hits.map((h) => h.node_id);
     }
     const synth = new Synthesizer(this, this.inference);
     const result = await synth.synthesize(query, leafIds, path);
