@@ -1,0 +1,89 @@
+[
+  {
+    "question": "What is the headline reduction target?",
+    "expected_doc_id": null,
+    "expected_pages": [],
+    "expected_phrases": ["38 percent"],
+    "expected_leaf_ids": []
+  },
+  {
+    "question": "What is the carbon adjustment fee in year one?",
+    "expected_phrases": ["12 synthetic units"],
+    "expected_leaf_ids": []
+  },
+  {
+    "question": "When does the regional emissions trading system launch?",
+    "expected_phrases": ["year 4"],
+    "expected_leaf_ids": []
+  },
+  {
+    "question": "What is the implementation timeline?",
+    "expected_phrases": ["five distinct phases", "five phases"],
+    "expected_leaf_ids": []
+  },
+  {
+    "question": "What stakeholders are mapped in the brief?",
+    "expected_phrases": ["regional utility authority", "manufacturing council", "freight industry"],
+    "expected_leaf_ids": []
+  },
+  {
+    "question": "How does the brief address economic risk?",
+    "expected_phrases": ["carbon leakage"],
+    "expected_leaf_ids": []
+  },
+  {
+    "question": "What independent verification mechanism is proposed?",
+    "expected_phrases": ["independent monitoring board"],
+    "expected_leaf_ids": []
+  },
+  {
+    "question": "Which sectors are the priority sectors?",
+    "expected_phrases": ["heavy manufacturing", "power generation", "freight transport"],
+    "expected_leaf_ids": []
+  },
+  {
+    "question": "What is the estimated cost range?",
+    "expected_phrases": ["4.2 billion", "6.8 billion"],
+    "expected_leaf_ids": []
+  },
+  {
+    "question": "How are equity risks mitigated?",
+    "expected_phrases": ["rebated", "median income"],
+    "expected_leaf_ids": []
+  },
+  {
+    "question": "When is the comprehensive review scheduled?",
+    "expected_phrases": ["year 5"],
+    "expected_leaf_ids": []
+  },
+  {
+    "question": "What three subsectors dominate heavy manufacturing emissions?",
+    "expected_phrases": ["steel", "cement", "chemical processing"],
+    "expected_leaf_ids": []
+  },
+  {
+    "question": "How frequently are facilities required to report emissions?",
+    "expected_phrases": ["quarterly"],
+    "expected_leaf_ids": []
+  },
+  {
+    "question": "What incentive programs are proposed?",
+    "expected_phrases": ["retrofit grant", "modal-shift", "clean-power"],
+    "expected_leaf_ids": []
+  },
+  {
+    "question": "What is the disclosure threshold?",
+    "expected_phrases": ["25,000 metric tons"],
+    "expected_leaf_ids": []
+  },
+  {
+    "question": "When does the retrofit grant program open?",
+    "expected_phrases": ["year 2", "quarter 3"],
+    "expected_leaf_ids": []
+  },
+  {
+    "question": "How does the brief describe peer regions?",
+    "expected_phrases": ["45 percent", "steeper"],
+    "expected_leaf_ids": []
+  }
+]
