@@ -150,6 +150,30 @@ ui.fileInput.addEventListener("change", async (ev) => {
   ev.target.value = "";
 });
 
+// Drag-and-drop onto the body lets users drop md/txt/pdf files anywhere.
+const ACCEPTED = new Set(["md", "markdown", "txt", "pdf", "json"]);
+document.body.addEventListener("dragover", (ev) => {
+  if (!ev.dataTransfer || !ev.dataTransfer.types.includes("Files")) return;
+  ev.preventDefault();
+  document.body.classList.add("drag-active");
+});
+document.body.addEventListener("dragleave", (ev) => {
+  if (ev.target === document.body) document.body.classList.remove("drag-active");
+});
+document.body.addEventListener("drop", async (ev) => {
+  if (!ev.dataTransfer || !ev.dataTransfer.files.length) return;
+  ev.preventDefault();
+  document.body.classList.remove("drag-active");
+  for (const file of ev.dataTransfer.files) {
+    const ext = (file.name.split(".").pop() || "").toLowerCase();
+    if (!ACCEPTED.has(ext)) {
+      appendSystem(ui.conversation, `Skipped ${file.name}: unsupported type`, "warn");
+      continue;
+    }
+    await ingestFile(file);
+  }
+});
+
 ui.btnPaste.addEventListener("click", () => {
   ui.pasteTitle.value = "";
   ui.pasteBody.value = "";
