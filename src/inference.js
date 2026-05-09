@@ -88,6 +88,10 @@ export class InferenceEngine {
     });
     let stoppedAt = "natural";
     let output;
+    const signal = opts.signal;
+    if (signal && signal.aborted) {
+      throw new DOMException("aborted", "AbortError");
+    }
     try {
       output = await this.model.generate({
         ...inputs,
@@ -96,6 +100,7 @@ export class InferenceEngine {
         top_k: genOpts.top_k,
         repetition_penalty: genOpts.repetition_penalty,
         do_sample: genOpts.do_sample,
+        ...(signal ? { signal } : {}),
       });
     } catch (e) {
       if (e.name === "AbortError") {
@@ -140,6 +145,10 @@ export class InferenceEngine {
         if (typeof onToken === "function") onToken(chunk, false);
       },
     });
+    const signal = opts && opts.signal;
+    if (signal && signal.aborted) {
+      throw new DOMException("aborted", "AbortError");
+    }
     try {
       await this.model.generate({
         ...inputs,
@@ -149,6 +158,7 @@ export class InferenceEngine {
         repetition_penalty: genOpts.repetition_penalty,
         do_sample: genOpts.do_sample,
         streamer,
+        ...(signal ? { signal } : {}),
       });
     } catch (e) {
       if (e.name === "AbortError") throw e;
