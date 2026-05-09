@@ -164,6 +164,22 @@ function deriveTitle(textSlice) {
   return firstLine || "Untitled";
 }
 
+export function chunkPlainText(text, opts = {}) {
+  const targetChars = opts.targetChars || TARGET_CHARS;
+  const maxChars = opts.maxChars || MAX_CHARS;
+  const chunks = [];
+  const pieces = splitBySentences(text, targetChars, maxChars);
+  let cursor = 0;
+  for (const piece of pieces) {
+    const idx = text.indexOf(piece, cursor);
+    const start = idx >= 0 ? idx : cursor;
+    const end = start + piece.length;
+    chunks.push(makeLeaf(piece, start, end));
+    cursor = end;
+  }
+  return chunks;
+}
+
 export function splitBySentences(text, targetChars = TARGET_CHARS, maxChars = MAX_CHARS) {
   const sentences = sentenceSplit(text);
   const chunks = [];
