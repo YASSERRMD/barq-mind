@@ -1,7 +1,7 @@
 // Document ingestion. Converts chunk trees from chunker.js into NodeRecord
 // subtrees attached to the Corpus. Summaries remain empty until Phase 7.
 
-import { chunkMarkdown } from "./chunker.js";
+import { chunkMarkdown, chunkPlainText, chunkPagedDocument } from "./chunker.js";
 import { makeNode, nodeId } from "./tree.js";
 
 let counter = 0;
@@ -92,6 +92,130 @@ export async function ingestMarkdown(corpus, opts) {
     title,
     subtreeRoot: docRoot,
     rawText: text,
+  });
+  return docRoot;
+}
+
+export async function ingestPlainText(corpus, opts) {
+  const { title, text } = opts;
+  const docId = opts.docId || genDocId();
+  const leaves = chunkPlainText(text);
+  const docRootId = nodeId({ doc: docId, root: "root" });
+
+  const childIds = [];
+  for (const leaf of leaves) {
+    const id = nodeId({ doc: docId, leaf: nextLeafIndex(corpus, docId) });
+    const node = makeNode({
+      node_id: id,
+      doc_id: docId,
+      parent_id: docRootId,
+      title: leaf.title || "Untitled",
+      level: "leaf",
+      child_ids: [],
+      span: [leaf.char_start, leaf.char_end],
+      is_leaf: true,
+    });
+    corpus.tree.upsertNode(node);
+    childIds.push(id);
+  }
+
+  const docRoot = makeNode({
+    node_id: docRootId,
+    doc_id: docId,
+    parent_id: corpus.tree.rootId,
+    title,
+    level: "document",
+    child_ids: childIds,
+    is_leaf: false,
+  });
+  corpus.tree.upsertNode(docRoot);
+
+  await corpus.addDocument({
+    docId,
+    title,
+    subtreeRoot: docRoot,
+    rawText: text,
+  });
+  return docRoot;
+}
+
+export async function ingestPaged(corpus, opts) {
+  const { title, pages } = opts;
+  const docId = opts.docId || genDocId();
+  const concatenated = pages.map((p) => p.text || "").join("\n");
+  const pageNodes = chunkPagedDocument(pages);
+  const docRootId = nodeId({ doc: docId, root: "root" });
+
+  const pageIds = [];
+  for (const pageChunk of pageNodes) {
+    const pageId = nodeId({ doc: docId, page: pageChunk.page_start });
+    const leafIds = [];
+    if (pageChunk.children && pageChunk.children.length > 0) {
+      for (const leaf of pageChunk.children) {
+        const lid = nodeId({ doc: docId, page: pageChunk.page_start, leaf: nextLeafIndex(corpus, docId) });
+        const leafNode = makeNode({
+          node_id: lid,
+          doc_id: docId,
+          parent_id: pageId,
+          title: leaf.title || "Untitled",
+          level: "leaf",
+          child_ids: [],
+          span: [leaf.char_start, leaf.char_end],
+          page_start: leaf.page_start,
+          page_end: leaf.page_end,
+          is_leaf: true,
+        });
+        corpus.tree.upsertNode(leafNode);
+        leafIds.push(lid);
+      }
+    } else {
+      const lid = nodeId({ doc: docId, page: pageChunk.page_start, leaf: nextLeafIndex(corpus, docId) });
+      const leafNode = makeNode({
+        node_id: lid,
+        doc_id: docId,
+        parent_id: pageId,
+        title: pageChunk.title,
+        level: "leaf",
+        child_ids: [],
+        span: [pageChunk.char_start, pageChunk.char_end],
+        page_start: pageChunk.page_start,
+        page_end: pageChunk.page_end,
+        is_leaf: true,
+      });
+      corpus.tree.upsertNode(leafNode);
+      leafIds.push(lid);
+    }
+    const pageNode = makeNode({
+      node_id: pageId,
+      doc_id: docId,
+      parent_id: docRootId,
+      title: pageChunk.title,
+      level: "page",
+      child_ids: leafIds,
+      page_start: pageChunk.page_start,
+      page_end: pageChunk.page_end,
+      is_leaf: false,
+    });
+    corpus.tree.upsertNode(pageNode);
+    pageIds.push(pageId);
+  }
+
+  const docRoot = makeNode({
+    node_id: docRootId,
+    doc_id: docId,
+    parent_id: corpus.tree.rootId,
+    title,
+    level: "document",
+    child_ids: pageIds,
+    is_leaf: false,
+  });
+  corpus.tree.upsertNode(docRoot);
+
+  await corpus.addDocument({
+    docId,
+    title,
+    subtreeRoot: docRoot,
+    rawText: concatenated,
   });
   return docRoot;
 }
