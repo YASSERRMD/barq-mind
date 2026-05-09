@@ -11,6 +11,7 @@ import {
   appendTrace,
 } from "./ui/conversation.js";
 import { renderTreeView } from "./ui/tree-view.js";
+import { EvalHarness } from "./eval.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -294,5 +295,95 @@ ui.composer.addEventListener("submit", async (ev) => {
     await refresh();
   }
 });
+
+// Eval harness wiring.
+const evalUi = {
+  pane: $("eval-pane"),
+  btnRun: $("btn-eval-run"),
+  btnBaseline: $("btn-eval-baseline"),
+  btnExport: $("btn-eval-export"),
+};
+let lastEvalReport = null;
+
+async function loadEvalSet() {
+  const res = await fetch("samples/eval-set.json");
+  if (!res.ok) throw new Error("eval-set.json not found");
+  return await res.json();
+}
+
+function renderEvalSummary(report, mode) {
+  const s = report.summary;
+  evalUi.pane.innerHTML = `
+    <div class="eval-mode">${mode}</div>
+    <div class="eval-grid">
+      <span>items</span><b>${s.itemCount}</b>
+      <span>doc</span><b>${(s.avgDocRecall * 100).toFixed(0)}%</b>
+      <span>leaf</span><b>${(s.avgLeafRecall * 100).toFixed(0)}%</b>
+      <span>pages</span><b>${(s.avgPageRecall * 100).toFixed(0)}%</b>
+      <span>phrases</span><b>${(s.avgPhrasesPresent * 100).toFixed(0)}%</b>
+      <span>cite</span><b>${(s.citationRate * 100).toFixed(0)}%</b>
+      <span>p50</span><b>${s.latencyP50.toFixed(0)}ms</b>
+      <span>p95</span><b>${s.latencyP95.toFixed(0)}ms</b>
+    </div>
+  `;
+}
+
+if (evalUi.btnRun) {
+  evalUi.btnRun.addEventListener("click", async () => {
+    if (!db.inference.ready) {
+      appendSystem(ui.conversation, "Load the model first.", "warn");
+      return;
+    }
+    setBusy(true, "running eval");
+    try {
+      const set = await loadEvalSet();
+      const harness = new EvalHarness(db);
+      lastEvalReport = await harness.run(set, {
+        maxDepth: parseInt(ui.optDepth.value, 10) || 4,
+        branchFactor: parseInt(ui.optBranch.value, 10) || 1,
+      });
+      renderEvalSummary(lastEvalReport, "tree+LLM");
+      appendSystem(ui.conversation, `Eval complete: ${lastEvalReport.summary.itemCount} items.`, "ok");
+    } catch (e) {
+      appendSystem(ui.conversation, `Eval failed: ${e.message}`, "warn");
+    } finally {
+      setBusy(false);
+    }
+  });
+}
+
+if (evalUi.btnBaseline) {
+  evalUi.btnBaseline.addEventListener("click", async () => {
+    setBusy(true, "running baseline");
+    try {
+      const set = await loadEvalSet();
+      const harness = new EvalHarness(db);
+      lastEvalReport = await harness.runBaselineBM25(set);
+      renderEvalSummary(lastEvalReport, "BM25 only");
+    } catch (e) {
+      appendSystem(ui.conversation, `Baseline failed: ${e.message}`, "warn");
+    } finally {
+      setBusy(false);
+    }
+  });
+}
+
+if (evalUi.btnExport) {
+  evalUi.btnExport.addEventListener("click", () => {
+    if (!lastEvalReport) {
+      appendSystem(ui.conversation, "Run eval first.", "warn");
+      return;
+    }
+    const harness = new EvalHarness(db);
+    const md = harness.toMarkdown(lastEvalReport);
+    const blob = new Blob([md], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `barq-mind-eval-${Date.now()}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+}
 
 bootstrap();

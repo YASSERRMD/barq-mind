@@ -296,3 +296,8 @@ input:focus, textarea:focus, select:focus {
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
 
 .hint { color: var(--text-muted); font-size: 12px; }
+
+.eval-mode { color: var(--accent); font-family: var(--mono); font-size: 11px; margin-bottom: 6px; }
+.eval-grid { display: grid; grid-template-columns: 60px 1fr; gap: 4px 10px; font-family: var(--mono); font-size: 11px; }
+.eval-grid span { color: var(--text-muted); }
+.eval-grid b { color: var(--text); font-weight: 500; }
