@@ -24,7 +24,7 @@
     <div class="topbar-meta">
       <span id="status-dot" class="status-dot idle" title="idle"></span>
       <span id="status-text" class="status-text">idle</span>
-      <span class="version">v0.1.0-dev</span>
+      <span class="version">v0.1.0</span>
     </div>
   </header>
 
@@ -97,6 +97,22 @@
       </section>
     </aside>
   </main>
+
+  <dialog id="tour-dialog" class="dialog">
+    <form method="dialog" class="tour-form">
+      <h3>Welcome to barq-mind</h3>
+      <p class="hint">A 30-second tour of the prototype.</p>
+      <ol class="tour-steps">
+        <li><b>Load Model</b> downloads LFM2.5-1.2B-Instruct (~700 MB on first run, cached after).</li>
+        <li><b>Sample</b> ingests a synthetic policy brief and triggers tree summarization.</li>
+        <li>Type a question (try: "What is the implementation timeline?") and watch the navigation path in the right pane.</li>
+        <li>Toggle <b>show trace</b> in the toolbar to see why the agent chose each step.</li>
+      </ol>
+      <div class="dialog-actions">
+        <button value="ok" class="primary">Got it</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog id="paste-dialog" class="dialog">
     <form method="dialog" class="paste-form">

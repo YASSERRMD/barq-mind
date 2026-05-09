@@ -301,3 +301,18 @@ input:focus, textarea:focus, select:focus {
 .eval-grid { display: grid; grid-template-columns: 60px 1fr; gap: 4px 10px; font-family: var(--mono); font-size: 11px; }
 .eval-grid span { color: var(--text-muted); }
 .eval-grid b { color: var(--text); font-weight: 500; }
+
+.fallback-banner {
+  margin: 18px 22px 0;
+  padding: 14px 18px;
+  background: var(--bg-1);
+  border: 1px solid var(--err);
+  border-radius: 8px;
+}
+.fallback-banner h3 { margin: 0 0 6px 0; color: var(--err); font-size: 14px; }
+.fallback-banner code { background: var(--bg-2); padding: 1px 6px; border-radius: 3px; }
+
+.tour-form { display: flex; flex-direction: column; gap: 10px; }
+.tour-form h3 { margin: 0; color: var(--accent); }
+.tour-steps { margin: 0; padding-left: 22px; }
+.tour-steps li { margin: 4px 0; }
