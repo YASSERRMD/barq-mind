@@ -41,25 +41,42 @@ export async function buildLeafPayloads(db, leafIds) {
 
 export function extractCitations(response) {
   if (typeof response !== "string") return { answer: "", citations: [] };
-  const sourcesIdx = response.search(/\n\s*Sources:\s*/i);
-  if (sourcesIdx === -1) return { answer: response.trim(), citations: [] };
-  const answer = response.slice(0, sourcesIdx).trim();
-  const sourcesLine = response.slice(sourcesIdx).replace(/\n\s*Sources:\s*/i, "").trim();
-  const items = sourcesLine.split(/[,;]\s+/);
+  // Match "Sources:" at the start of the string, after a newline, or after
+  // sentence punctuation. Small models often inline the line instead of
+  // putting it on its own line; accept both shapes.
+  const re = /(?:^|\n|[.!?]\s+)Sources:\s*/i;
+  const match = re.exec(response);
+  if (!match) return { answer: response.trim(), citations: [] };
+  const splitAt = match.index + match[0].length;
+  const headEnd = match.index + (match[0].startsWith("\n") || match.index === 0 ? 0 : 1);
+  const answer = response.slice(0, headEnd).trim();
+  const sourcesLine = response.slice(splitAt).trim();
   const citations = [];
-  for (const raw of items) {
-    const item = raw.replace(/[.;]\s*$/, "").trim();
-    if (!item) continue;
-    const idMatch = /\[([^\]]+)\]/.exec(item);
-    if (idMatch) {
-      citations.push({ section: item.replace(/\s*\[[^\]]+\]\s*/, "").trim() || idMatch[1], node_id: idMatch[1], page: null });
-      continue;
-    }
-    const pageMatch = /(.+?)\s+(?:p|pp|pages?)\.?\s*([\d-]+)/i.exec(item);
-    if (pageMatch) {
-      citations.push({ section: pageMatch[1].trim(), page: pageMatch[2].trim() });
-    } else {
-      citations.push({ section: item, page: null });
+  // Strategy 1: anchored on [node_id] brackets. Each citation is the run of
+  // text up to and including the next `[...]`. This is robust to commas
+  // inside section titles.
+  const bracketPattern = /([^\[]*?)\[([^\]]+)\]/g;
+  let consumed = 0;
+  let bm;
+  while ((bm = bracketPattern.exec(sourcesLine)) !== null) {
+    const titleRaw = bm[1].replace(/^[,;\s]+|[,;.\s]+$/g, "").trim();
+    const nodeId = bm[2].trim();
+    citations.push({ section: titleRaw || nodeId, node_id: nodeId, page: null });
+    consumed = bm.index + bm[0].length;
+  }
+  // Strategy 2: page-citations like "Title p3, Title p7-8". Only fall through
+  // when no bracketed citations were extracted, to avoid double-counting.
+  if (citations.length === 0) {
+    const items = sourcesLine.split(/[,;](?![^\[]*\])\s+/);
+    for (const raw of items) {
+      const item = raw.replace(/[.;]\s*$/, "").trim();
+      if (!item) continue;
+      const pageMatch = /(.+?)\s+(?:p|pp|pages?)\.?\s*([\d-]+)/i.exec(item);
+      if (pageMatch) {
+        citations.push({ section: pageMatch[1].trim(), page: pageMatch[2].trim() });
+      } else {
+        citations.push({ section: item, page: null });
+      }
     }
   }
   return { answer, citations };
