@@ -48,7 +48,12 @@
       <section class="panel">
         <h2>Documents</h2>
         <div class="row-buttons">
-          <input type="file" id="file-input" multiple accept=".txt,.md,.markdown,.pdf,.json" hidden />
+          <input
+            type="file"
+            id="file-input"
+            multiple
+            accept=".txt,.md,.markdown,.pdf,.json,text/plain,text/markdown,application/pdf,application/json"
+            style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0" />
           <button id="btn-upload">Upload</button>
           <button id="btn-paste">Paste</button>
           <button id="btn-load-sample">Sample</button>

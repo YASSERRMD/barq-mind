@@ -134,17 +134,23 @@ ui.btnLoadModel.addEventListener("click", async () => {
 
 async function ingestFile(file) {
   const ext = (file.name.split(".").pop() || "").toLowerCase();
+  const mime = (file.type || "").toLowerCase();
   const title = file.name.replace(/\.[^.]+$/, "");
+  const sizeKB = (file.size / 1024).toFixed(1);
+  appendSystem(ui.conversation, `Reading ${file.name} (${sizeKB} KB, type=${mime || "unknown"})...`, "info");
   setBusy(true, `ingesting ${file.name}`);
   try {
     let result;
-    if (ext === "pdf") {
+    const isPdf = ext === "pdf" || mime === "application/pdf";
+    const isMd = ext === "md" || ext === "markdown" || mime === "text/markdown";
+    const isJson = ext === "json" || mime === "application/json";
+    if (isPdf) {
       const buf = await file.arrayBuffer();
       result = await db.ingest({ type: "pdf", title, content: buf });
-    } else if (ext === "md" || ext === "markdown") {
+    } else if (isMd) {
       const text = await file.text();
       result = await db.ingest({ type: "markdown", title, content: text });
-    } else if (ext === "json") {
+    } else if (isJson) {
       const json = JSON.parse(await file.text());
       await db.importJSON(json);
       appendSystem(ui.conversation, "Imported corpus JSON", "ok");
@@ -156,16 +162,28 @@ async function ingestFile(file) {
     }
     appendSystem(ui.conversation, `Ingested "${title}" (${result.leafCount} leaves).`, "ok");
   } catch (e) {
-    appendSystem(ui.conversation, `Ingest failed: ${e.message}`, "warn");
+    console.error("Ingest failed:", e);
+    appendSystem(ui.conversation, `Ingest failed for ${file.name}: ${e.message}`, "warn");
   } finally {
     setBusy(false);
     await refresh();
   }
 }
 
-ui.btnUpload.addEventListener("click", () => ui.fileInput.click());
+ui.btnUpload.addEventListener("click", () => {
+  if (busy) {
+    appendSystem(ui.conversation, "Busy — wait for the current operation to finish before uploading.", "warn");
+    return;
+  }
+  ui.fileInput.click();
+});
 ui.fileInput.addEventListener("change", async (ev) => {
-  for (const file of ev.target.files) {
+  const files = Array.from(ev.target.files || []);
+  if (files.length === 0) {
+    appendSystem(ui.conversation, "No file selected.", "info");
+    return;
+  }
+  for (const file of files) {
     await ingestFile(file);
   }
   ev.target.value = "";
