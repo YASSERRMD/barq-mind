@@ -20,10 +20,9 @@ function chunkLevelFor(depth, isLeaf) {
 
 function attachChunk(corpus, docId, parentId, chunk, depth) {
   const isLeaf = !chunk.children || chunk.children.length === 0;
-  const isSection = !isLeaf;
   const idParts = isLeaf
     ? { doc: docId, leaf: nextLeafIndex(corpus, docId) }
-    : { doc: docId, sec: sectionPath(parentId, depth) };
+    : { doc: docId, sec: nextSectionPath(corpus, docId, depth) };
   const id = nodeId(idParts);
 
   const childIds = [];
@@ -58,9 +57,15 @@ function nextLeafIndex(corpus, docId) {
   return String(next);
 }
 
+// Per-doc monotonic section counter. The previous (parentId, depth) keying
+// produced "${depth}.${counter}" strings that collided across cousins
+// (e.g. the first H3 under H2-A and the first H3 under H2-B both returned
+// "3.1"), and upsertNode silently overwrote one with the other. Using a
+// single counter per doc gives every section a unique identifier while
+// preserving depth as a hint in the returned string.
 const sectionCounters = new Map();
-function sectionPath(parentId, depth) {
-  const key = `${parentId}:${depth}`;
+function nextSectionPath(corpus, docId, depth) {
+  const key = `${corpus.name}:${docId}`;
   const next = (sectionCounters.get(key) || 0) + 1;
   sectionCounters.set(key, next);
   return `${depth}.${next}`;
