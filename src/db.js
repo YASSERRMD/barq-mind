@@ -50,8 +50,14 @@ export class Corpus {
     if (!docId || !subtreeRoot) {
       throw new Error("addDocument: docId and subtreeRoot required");
     }
-    if (this.tree.getNode(subtreeRoot.node_id)) {
-      throw new Error(`addDocument: node ${subtreeRoot.node_id} already exists`);
+    // The subtree root is expected to already be in the tree (ingestors build
+    // it before calling addDocument). Guard against re-registering the same
+    // docId, not against the node existing in the Map.
+    if (this.tree.docIndex[docId]) {
+      throw new Error(`addDocument: docId ${docId} already registered`);
+    }
+    if (!this.tree.getNode(subtreeRoot.node_id)) {
+      this.tree.upsertNode(subtreeRoot);
     }
     const corpusRoot = this.tree.getRoot();
     if (!corpusRoot.child_ids.includes(subtreeRoot.node_id)) {

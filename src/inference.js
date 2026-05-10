@@ -14,6 +14,40 @@ export class InferenceError extends Error {
   }
 }
 
+// In transformers.js v3 the tokenizer/generator returned plain JS arrays.
+// In v4 they return ORT-backed Tensor instances (with BigInt token ids).
+// These helpers normalize both shapes to a flat Array<number> of generated
+// token ids that the tokenizer.decode() accepts.
+
+function inputLenOf(inputIds) {
+  if (Array.isArray(inputIds)) {
+    return Array.isArray(inputIds[0]) ? inputIds[0].length : inputIds.length;
+  }
+  if (inputIds && Array.isArray(inputIds.dims) && inputIds.dims.length >= 2) {
+    return Number(inputIds.dims[inputIds.dims.length - 1]);
+  }
+  return 0;
+}
+
+function sliceGenerated(output, inputLen) {
+  // v3 array shape: number[][] or number[]
+  if (Array.isArray(output)) {
+    const row = Array.isArray(output[0]) ? output[0] : output;
+    return row.slice(inputLen).map(Number);
+  }
+  // v4 Tensor: prefer .tolist() (matches ORT typing); fall back to .data
+  if (output && typeof output.tolist === "function") {
+    const list = output.tolist();
+    const row = Array.isArray(list[0]) ? list[0] : list;
+    return row.slice(inputLen).map(Number);
+  }
+  if (output && output.data) {
+    const arr = Array.from(output.data, (v) => Number(v));
+    return arr.slice(inputLen);
+  }
+  return [];
+}
+
 const DEFAULT_MODEL_ID = "LiquidAI/LFM2.5-1.2B-Instruct-ONNX";
 const DEFAULT_GEN = {
   max_new_tokens: 512,
@@ -75,8 +109,26 @@ export class InferenceEngine {
   _onProgress(cb, p) {
     if (typeof cb !== "function") return;
     try {
-      const pct = typeof p.progress === "number" ? p.progress : 0;
-      cb(pct, p.file || p.name || "");
+      // Transformers.js v3 reported progress as 0..1; v4 reports 0..100 and adds
+      // a `progress_total` aggregate event. Normalize to 0..1 so the public
+      // contract stays the same regardless of upstream version.
+      let pct = typeof p.progress === "number" ? p.progress : 0;
+      if (pct > 1) pct = pct / 100;
+      if (pct < 0) pct = 0;
+      if (pct > 1) pct = 1;
+      // Prefer per-file label; fall back to the aggregate status when v4
+      // emits `progress_total` with the repo name (not file-shaped).
+      let label = p.file || "";
+      if (!label) {
+        if (p.status === "progress_total" || p.status === "download") {
+          label = "downloading";
+        } else if (p.status === "ready" || p.status === "done") {
+          label = "ready";
+        } else {
+          label = p.name || "";
+        }
+      }
+      cb(pct, label);
     } catch {
       // swallow callback errors
     }
@@ -120,18 +172,14 @@ export class InferenceEngine {
       }
       throw new InferenceError(`generate failed: ${e.message}`, "GEN_FAILED", e);
     }
-    const inputLen = Array.isArray(inputs.input_ids[0])
-      ? inputs.input_ids[0].length
-      : inputs.input_ids.dims?.[1] || 0;
-    const generated = Array.isArray(output[0])
-      ? output[0].slice(inputLen)
-      : output;
+    const inputLen = inputLenOf(inputs.input_ids);
+    const generated = sliceGenerated(output, inputLen);
     const text = this.tokenizer.decode(generated, { skip_special_tokens: true });
     const duration = performance.now() - t0;
     this.totalCalls++;
-    this.totalGeneratedTokens += Array.isArray(generated) ? generated.length : 0;
+    this.totalGeneratedTokens += generated.length;
     this.totalDurationMs += duration;
-    profiler.end(span, { tokens_out: Array.isArray(generated) ? generated.length : 0 });
+    profiler.end(span, { tokens_out: generated.length });
     return {
       text,
       raw_tokens: Array.isArray(generated) ? generated.length : 0,

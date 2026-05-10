@@ -135,6 +135,17 @@ export class Navigator {
   }
 
   async callNavigate(query, currentNode, childOptions) {
+    // Trivial case: only one candidate. There is nothing to choose, so skip
+    // the LLM call. This avoids both wasted latency and a class of confusion
+    // bugs we saw with small models attempting "select_leaves" against a
+    // single non-leaf child.
+    if (childOptions.length === 1) {
+      const only = childOptions[0];
+      const action = only.is_leaf
+        ? { action: "select_leaves", leaf_ids: [only.node_id], reason: "only candidate" }
+        : { action: "descend", child_ids: [only.node_id], reason: "only candidate" };
+      return action;
+    }
     const cacheK = routingKey(query, currentNode.node_id, childOptions.map((c) => c.node_id));
     const hit = cacheGet(cacheK);
     if (hit) return hit;

@@ -67,16 +67,22 @@ function formatCurrentNode(node) {
 }
 
 function formatChildren(children) {
-  if (!children || !children.length) return "Candidate children: (none)";
-  // When there are many candidates, the navigation prompt becomes long and
-  // the model takes longer to generate. Cap each summary at 80 chars when
-  // the candidate count exceeds 8; full summaries otherwise.
+  if (!children || !children.length) return "Candidates: (none)";
+  // Use a JSON-array format so the model echoes the `id` field verbatim
+  // instead of treating the surrounding text as part of the id.
+  // Cap each summary when the candidate list is large to control prompt size.
   const charBudget = children.length > 8 ? 80 : 220;
-  const lines = children.map(
-    (c, i) =>
-      `${i + 1}. id=${c.node_id} | leaf=${!!c.is_leaf} | level=${c.level} | title="${c.title}"\n   summary: ${(c.routing_summary || c.summary || "").slice(0, charBudget)}`
-  );
-  return `Candidate children:\n${lines.join("\n")}`;
+  const items = children.map((c) => {
+    const obj = {
+      id: c.node_id,
+      title: c.title,
+      level: c.level,
+      is_leaf: !!c.is_leaf,
+      summary: (c.routing_summary || c.summary || "").slice(0, charBudget),
+    };
+    return "  " + JSON.stringify(obj);
+  });
+  return `Candidates (JSON array; copy "id" values exactly):\n[\n${items.join(",\n")}\n]`;
 }
 
 export function promptNavigate(query, currentNode, childOptions) {
@@ -99,15 +105,25 @@ export const SYNTHESIZE_SYSTEM =
   "page numbers (or node_ids if no pages). If the excerpts do not contain the answer, " +
   "say 'Insufficient evidence in the indexed sources.'";
 
+function citationLabel(leaf) {
+  if (leaf.page_start != null) {
+    const pageRange =
+      leaf.page_end && leaf.page_end !== leaf.page_start
+        ? `${leaf.page_start}-${leaf.page_end}`
+        : `${leaf.page_start}`;
+    return `${leaf.title} p${pageRange}`;
+  }
+  return `${leaf.title} [${leaf.node_id}]`;
+}
+
 function formatLeaves(leaves) {
+  // Use the citation label itself as the excerpt header so the model is
+  // primed to copy it verbatim into the Sources line. Avoid bare numeric
+  // indexes like "[1]" that the model otherwise echoes back as "Excerpt 1".
   return leaves
-    .map((leaf, i) => {
-      const loc =
-        leaf.page_start != null
-          ? `${leaf.title} (p${leaf.page_start}${leaf.page_end && leaf.page_end !== leaf.page_start ? `-p${leaf.page_end}` : ""})`
-          : `${leaf.title} [${leaf.node_id}]`;
+    .map((leaf) => {
       const text = (leaf.text || "").slice(0, 1500);
-      return `[${i + 1}] ${loc}\n${text}`;
+      return `--- ${citationLabel(leaf)} ---\n${text}`;
     })
     .join("\n\n");
 }
@@ -117,13 +133,20 @@ export function promptSynthesize(query, leaves, navPath) {
     navPath && navPath.length
       ? `Navigation path: ${navPath.map((p) => p.title || p).join(" > ")}`
       : "Navigation path: (root)";
+  const citationExamples = leaves
+    .slice(0, 2)
+    .map(citationLabel)
+    .join(", ");
   return [
     { role: "system", content: SYNTHESIZE_SYSTEM },
     {
       role: "user",
       content:
         `Question: ${query}\n\n${pathLine}\n\nExcerpts:\n${formatLeaves(leaves)}\n\n` +
-        `Answer in 2 to 4 sentences using ONLY the excerpts. End with a single line beginning with "Sources:" listing section titles with pages or node_ids.`,
+        `Answer in 2 to 4 sentences using ONLY the excerpts. ` +
+        `End with a single line beginning with "Sources:" that lists the section labels exactly as shown above the excerpts ` +
+        `(for example: Sources: ${citationExamples || "<section title> p<page>"}). ` +
+        `Do NOT use generic labels like "Excerpt 1".`,
     },
   ];
 }
