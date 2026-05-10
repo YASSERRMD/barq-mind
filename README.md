@@ -9,13 +9,29 @@
 </p>
 
 <p align="center">
+  <a href="https://yasserrmd.github.io/barq-mind/"><strong>▶︎ Live demo</strong></a>
+  &nbsp;·&nbsp;
+  <a href="docs/ARCHITECTURE.md">Architecture</a>
+  &nbsp;·&nbsp;
+  <a href="docs/PROMPTS.md">Prompts</a>
+  &nbsp;·&nbsp;
+  <a href="docs/EVAL.md">Evaluation</a>
+</p>
+
+<p align="center">
+  <a href="https://yasserrmd.github.io/barq-mind/"><img alt="live demo" src="https://img.shields.io/badge/demo-live-d4a574?style=flat-square&logo=githubpages&logoColor=white"></a>
+  <a href="https://github.com/YASSERRMD/barq-mind/releases/tag/v0.1.0"><img alt="version" src="https://img.shields.io/badge/version-v0.1.0-d4a574?style=flat-square"></a>
   <a href="#"><img alt="status" src="https://img.shields.io/badge/status-prototype-d4a574?style=flat-square"></a>
-  <a href="#"><img alt="version" src="https://img.shields.io/badge/version-v0.1.0-d4a574?style=flat-square"></a>
   <a href="#"><img alt="runtime" src="https://img.shields.io/badge/runtime-WebGPU-3fb950?style=flat-square"></a>
   <a href="#"><img alt="model" src="https://img.shields.io/badge/model-LFM2.5--1.2B-3fb950?style=flat-square"></a>
   <a href="#"><img alt="build" src="https://img.shields.io/badge/build-none%20required-3fb950?style=flat-square"></a>
   <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-8b949e?style=flat-square"></a>
 </p>
+
+---
+
+> **▶︎ Try it live:** [yasserrmd.github.io/barq-mind](https://yasserrmd.github.io/barq-mind/)
+> Requires Chrome 113+ or Edge 113+ with WebGPU. The first model load downloads ~700 MB into your browser cache; subsequent loads are seconds.
 
 ---
 
