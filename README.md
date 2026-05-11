@@ -59,23 +59,9 @@ The repository ships **v0.1.0** of the prototype: 17 phases of incremental, full
 
 ## Architecture at a glance
 
-```
-                          Query
-                            │
-                            ▼
-        ┌─────────────────────────────────────┐
-        │  Phase 1: Navigate (LLM call)       │
-        │  Tree of NodeRecord summaries       │
-        │  → selected leaf node IDs           │
-        └─────────────────────────────────────┘
-                            │
-                            ▼
-        ┌─────────────────────────────────────┐
-        │  Phase 2: Synthesize (LLM call)     │
-        │  Raw text spans for selected leaves │
-        │  → answer + citations               │
-        └─────────────────────────────────────┘
-```
+<p align="center">
+  <img src="docs/assets/architecture.png" alt="barq-mind architecture: two-call execution model" width="100%" />
+</p>
 
 For the full design, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Prompt contracts live in [`docs/PROMPTS.md`](docs/PROMPTS.md). The evaluation methodology is in [`docs/EVAL.md`](docs/EVAL.md).
 
