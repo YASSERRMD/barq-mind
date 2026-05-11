@@ -21,24 +21,9 @@ Every query runs two LLM calls in sequence:
 
 The two calls are never collapsed. Navigation cannot hallucinate the answer because it has no excerpts. Synthesis cannot hallucinate the path because it has no children. Each step does one job and is easy to inspect.
 
-```
-Query
-  │
-  ▼
-┌──────────────┐    descend / select_leaves     ┌──────────────┐
-│ Navigator    │ ────────────────────────────▶  │ Tree of      │
-│ (LLM call 1) │  ◀ candidates per depth        │ NodeRecords  │
-└──────────────┘                                └──────────────┘
-       │ selected leaf IDs
-       ▼
-┌──────────────┐    raw spans                   ┌──────────────┐
-│ Synthesizer  │ ────────────────────────────▶  │ Corpus blobs │
-│ (LLM call 2) │  ◀ leaf text                   │ (OPFS)       │
-└──────────────┘                                └──────────────┘
-       │
-       ▼
-   {answer, citations, trace, durationMs}
-```
+<p align="center">
+  <img src="assets/architecture.png" alt="barq-mind architecture: two-call execution model" width="100%" />
+</p>
 
 When the navigator emits `bm25_fallback` (or fails to parse twice), the Navigator returns query terms and CognitiveDB consults the BM25 index over leaf text and summaries before invoking the synthesizer. The synthesis prompt is identical; only the leaf source changes.
 
